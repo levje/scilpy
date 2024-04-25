@@ -15,7 +15,8 @@ deepdiff==6.3.0
 dmri-amico==2.0.*
 dmri-commit==2.1.*
 docopt==0.6.*
-dvc==3.48.*
+# dvc==3.48.* ========> Can't be installed on beluga. Results in:
+# Could not build wheels for pygit2,
 dvc-http==2.32.*
 formulaic==0.3.*
 fury==0.10.*
