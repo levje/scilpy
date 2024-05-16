@@ -16,7 +16,7 @@ formulaic==0.3.*
 fury==0.10.*
 future==0.18.*
 GitPython==3.1.*
-h5py==3.7.*
+h5py==3.10.*
 joblib==1.2.*
 kiwisolver==1.4.*
 matplotlib==3.6.*
