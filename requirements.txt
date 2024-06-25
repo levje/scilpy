@@ -1,3 +1,8 @@
+# For beluga: don't forget to run this in an environment with:
+# module load StdEnv/2023
+# module load python/3.10.13 rust/1.70.0
+# module load scipy-stack/2023b
+
 bids-validator==1.11.*
 bctpy==0.5.*
 bz2file==0.98.*
@@ -10,19 +15,20 @@ deepdiff==6.3.0
 dmri-amico==2.0.*
 dmri-commit==2.1.*
 docopt==0.6.*
-dvc==3.48.*
+# dvc==3.48.* ========> Can't be installed on beluga. Results in:
+# Could not build wheels for pygit2,
 dvc-http==2.32.*
 formulaic==0.3.*
 fury==0.10.*
 future==0.18.*
 GitPython==3.1.*
-h5py==3.7.*
+h5py==3.10.*
 joblib==1.2.*
 kiwisolver==1.4.*
 matplotlib==3.6.*
 nibabel==5.2.*
 nilearn==0.9.*
-numpy==1.23.*
+numpy==1.25.*
 openpyxl==3.0.*
 packaging == 23.2.*
 Pillow==10.2.*
@@ -39,7 +45,7 @@ pytz==2022.6.*
 requests==2.28.*
 scikit-learn==1.2.*
 scikit-image==0.22.*
-scipy==1.9.*
+scipy==1.11.*
 six==1.16.*
 spams==2.6.*
 statsmodels==0.13.*
