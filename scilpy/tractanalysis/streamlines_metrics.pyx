@@ -7,7 +7,7 @@
 
 cimport cython
 import numpy as np
-cimport numpy as np
+cimport numpy as cnp
 
 from libc.math cimport sqrt, floor, ceil, fabs
 from libc.math cimport fmin as cfmin
@@ -25,7 +25,7 @@ cdef inline double norm(double x, double y, double z) nogil:
 @cython.wraparound(False)
 cdef inline void c_get_closest_edge(double p_x, double p_y, double p_z,
                                     double d_x, double d_y, double d_z,
-                                    np.double_t[:] edge,
+                                    cnp.double_t[:] edge,
                                     double eps=1.) nogil:
      edge[0] = floor(p_x + eps) if d_x >= 0.0 else ceil(p_x - eps)
      edge[1] = floor(p_y + eps) if d_y >= 0.0 else ceil(p_y - eps)
@@ -47,11 +47,11 @@ def compute_tract_counts_map(streamlines, vol_dims):
     # Need to keep both the array and the memview on it to be able to
     # reshape and return in the end.
     traversal_tags = np.zeros((n_voxels,), dtype=int)
-    cdef np.int_t[:] traversal_tags_v = traversal_tags
+    cdef cnp.int_t[:] traversal_tags_v = traversal_tags
 
     # This array keeps track of whether the current track has already been
     # flagged in a specific voxel.
-    cdef np.int_t[:] touched_tags_v = np.zeros((n_voxels,), dtype=int)
+    cdef cnp.int_t[:] touched_tags_v = np.zeros((n_voxels,), dtype=int)
 
     cdef int streamlines_len = len(streamlines)
 
@@ -60,33 +60,33 @@ def compute_tract_counts_map(streamlines, vol_dims):
         return traversal_tags.reshape(vol_dims)
 
     # Memview to a streamline instance, which is a numpy array.
-    cdef np.double_t[:,:] t = streamlines[0].astype(np.double)
+    cdef cnp.double_t[:,:] t = streamlines[0].astype(np.double)
 
     # Memviews for points and direction vectors.
-    cdef np.double_t[:] in_pt = np.zeros(3, dtype=np.double)
-    cdef np.double_t[:] next_pt = np.zeros(3, dtype=np.double)
-    cdef np.double_t[:] dir_vect = np.zeros(3, dtype=np.double)
+    cdef cnp.double_t[:] in_pt = np.zeros(3, dtype=np.double)
+    cdef cnp.double_t[:] next_pt = np.zeros(3, dtype=np.double)
+    cdef cnp.double_t[:] dir_vect = np.zeros(3, dtype=np.double)
 
     # Memview for the current edge
-    cdef np.double_t[:] cur_edge = np.zeros(3, dtype=np.double)
+    cdef cnp.double_t[:] cur_edge = np.zeros(3, dtype=np.double)
 
     # Memview for the coordinates of the current voxel
-    cdef np.int_t[:] cur_voxel_coords = np.zeros(3, dtype=int)
+    cdef cnp.int_t[:] cur_voxel_coords = np.zeros(3, dtype=int)
 
     # various temporary loop and working variables
     #cdef:
     #    int track_idx   # Index of the track when iterating.
     cdef int tno, pno, cno
-    cdef np.npy_intp el_no, v
+    cdef cnp.npy_intp el_no, v
 
     cdef int vd[3]
     cdef double vxs[3]
     for cno in range(3):
         vd[cno] = vol_dims[cno]
     # x slice size (C array ordering)
-    cdef np.npy_intp x_slice_size = vd[1] * vd[2]
+    cdef cnp.npy_intp x_slice_size = vd[1] * vd[2]
 
-    cdef np.double_t dir_vect_norm, remaining_dist, length_ratio
+    cdef cnp.double_t dir_vect_norm, remaining_dist, length_ratio
 
     for track_idx in range(streamlines_len):
         t = streamlines[track_idx].astype(np.double)
