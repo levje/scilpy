@@ -21,17 +21,19 @@ from scilpy.io.utils import (add_overwrite_arg,
                              add_verbose_arg,
                              assert_inputs_exist,
                              assert_outputs_exist)
+from scilpy.version import version_string
 
 
 def _build_arg_parser():
-    p = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawTextHelpFormatter,
+                                epilog=version_string)
+
     p.add_argument('tractogram',
                    help='Tractogram file (must be trk)')
     p.add_argument('--save',
                    help='If set, save a screenshot of the result in the '
-                        'specified filename')
+                        'specified filename (.png, .bmp, .jpeg or .jpg).')
 
     add_verbose_arg(p)
     add_overwrite_arg(p)
@@ -65,7 +67,7 @@ def main():
 
     # Make display objects
     streamlines_actor = actor.line(streamlines)
-    points = actor.dot(seeds, color=(1., 1., 1.))
+    points = actor.dot(seeds, colors=(1., 1., 1.))
 
     # Add display objects to canvas
     s = window.Scene()

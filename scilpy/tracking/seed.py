@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+from typing import Literal
 
 from dipy.io.stateful_tractogram import Space, Origin
+from scilpy.tracking.fibertube_utils import sample_cylinder
 
 
 class SeedGenerator:
@@ -264,3 +266,184 @@ class SeedGenerator:
         random_generator.random_sample(random_numbers_to_skip)
 
         return random_generator, indices
+
+
+class FibertubeSeedGenerator(SeedGenerator):
+    """
+    Adaptation of the scilpy.tracking.seed.SeedGenerator interface for
+    fibertube tracking. Generates a given number of seed within the first
+    segment of a given number of fibertubes.
+    """
+    def __init__(self, centerlines, diameters, nb_seeds_per_fibertube,
+                    local_seeding: Literal['center', 'random']):
+        """
+        Parameters
+        ----------
+        centerlines: list
+            Tractogram containing the fibertube centerlines
+        diameters: list
+            Diameters of each fibertube
+        nb_seeds_per_fibertube: int
+            Number of seeds to be generated in each fibertube origin segment.
+        local_seeding: 'center' | 'random'
+            Seeding method within a fibertube origin segment
+        """
+        if local_seeding not in ['center', 'random']:
+            raise ValueError("The provided local_seeding parameter is not "
+                             "one of the expected choices: " + local_seeding)
+
+        self.space = Space.VOXMM
+        self.origin = Origin.NIFTI
+
+        self.centerlines = centerlines
+        self.diameters = diameters
+        self.nb_seeds_per_fibertube = nb_seeds_per_fibertube
+        self.local_seeding = local_seeding
+
+    def init_generator(self, rng_seed, numbers_to_skip):
+        """
+        Initialize a numpy number generator according to user's parameters.
+        Returns also the shuffled index of all fibertubes.
+
+        The values are not stored in this classed, but are returned to the
+        user, who should add them as arguments in the methods
+        self.get_next_pos()
+        self.get_next_n_pos()
+        The use of this is that with multiprocessing, each process may have its
+        own generator, with less risk of using the wrong one when they are
+        managed by the user.
+
+        Parameters
+        ----------
+        rng_seed : int
+            The "seed" for the random generator.
+        numbers_to_skip : int
+            Number of seeds (i.e. voxels) to skip. Useful if you want to
+            continue sampling from the same generator as in a first experiment
+            (with a fixed rng_seed).
+
+        Return
+        ------
+        random_generator : numpy random generator
+            Initialized numpy number generator.
+        indices : ndarray
+            Shuffled indices of current seeding map, shuffled with current
+            generator.
+        """
+        self.generator = np.random.RandomState(rng_seed)
+
+        # 1. Initializing seeding maps indices (shuffling in-place)
+        indices = np.arange(len(self.centerlines))
+        self.generator.shuffle(indices)
+
+        # 2. Generating the seed for the random sampling.
+        # Because FibertubeSeedGenerator uses rejection sampling to seed
+        # within a cylinder, we can't predict how many generator calls will
+        # be done in each thread to avoid duplicates. We instead generate a
+        # single, predictable number used as a seed for the rejection
+        # sampling.
+        while numbers_to_skip > 100000:
+            self.generator.random_sample(100000)
+            numbers_to_skip -= 100000
+        self.generator.random_sample(numbers_to_skip)
+        sampling_rng_seed = self.generator.randint(0, 2**32-1)
+        self.sampling_generator = np.random.default_rng(sampling_rng_seed)
+
+        return self.sampling_generator, indices
+
+    def get_next_pos(self, random_generator: np.random.Generator,
+                     shuffled_indices, which_seed):
+        which_fi = which_seed // self.nb_seeds_per_fibertube
+        fibertube = self.centerlines[shuffled_indices[which_fi]]
+
+        if self.local_seeding == 'center':
+            seed = (fibertube[0] + fibertube[1]) / 2
+
+        if self.local_seeding == 'random':
+            radius = self.diameters[shuffled_indices[which_fi]] / 2
+            seed = sample_cylinder(fibertube[0], fibertube[1], radius, 1,
+                                   random_generator)[0]
+
+        return seed[0], seed[1], seed[2]
+
+    def get_next_n_pos(self, random_generator, shuffled_indices,
+                       which_seed_start, n):
+        which_fi = which_seed_start // self.nb_seeds_per_fibertube
+        fibertube = self.centerlines[shuffled_indices[which_fi]]
+
+        if self.local_seeding == 'center':
+            seeds = [(fibertube[0] + fibertube[1]) / 2] * n
+
+        if self.local_seeding == 'random':
+            radius = self.diameters[shuffled_indices[which_fi]] / 2
+            seeds = sample_cylinder(fibertube[0], fibertube[1], radius, n,
+                                    random_generator)
+
+        return seeds
+
+
+class CustomSeedsDispenser(SeedGenerator):
+    """
+    Adaptation of the scilpy.tracking.seed.SeedGenerator interface for
+    using already generated, custom seeds.
+    """
+    def __init__(self, custom_seeds, space=Space('vox'),
+                 origin=Origin('center')):
+        """
+        Custom seeds need to be in the same space and origin as the ODFs used
+        for tracking.
+
+        Parameters
+        ----------
+        custom_seeds: list
+            Custom seeding coordinates.
+        space: Space (optional)
+            The Dipy space in which the seeds were saved.
+            Default: Space.Vox or 'vox'
+        origin: Origin (optional)
+            The Dipy origin in which the seeds were saved.
+            Default: Origin.NIFTI or 'center'
+        """
+        self.origin = origin
+        self.space = space
+        self.seeds = custom_seeds
+        self.i = 0
+
+    def init_generator(self, rng_seed, numbers_to_skip):
+        """
+        Does not do anything. Simulates SeedGenerator's implementation for
+        retro-compatibility.
+
+        Parameters
+        ----------
+        rng_seed : int
+            The "seed" for the random generator.
+        numbers_to_skip : int
+            Number of seeds (i.e. voxels) to skip. Useful if you want to
+            continue sampling from the same generator as in a first experiment
+            (with a fixed rng_seed).
+
+        Return
+        ------
+        random_generator : numpy random generator
+            Initialized numpy number generator.
+        indices : ndarray
+            Empty list for interface retro-compatibility
+        """
+        self.i = numbers_to_skip
+
+        return np.random.default_rng(rng_seed), []
+
+    def get_next_pos(self, random_generator: np.random.Generator,
+                     shuffled_indices, which_seed):
+        seed = self.seeds[self.i]
+        self.i += 1
+
+        return seed[0], seed[1], seed[2]
+
+    def get_next_n_pos(self, random_generator, shuffled_indices,
+                       which_seed_start, n):
+        seeds = self.seeds[self.i:self.i+n]
+        self.i += n
+
+        return seeds

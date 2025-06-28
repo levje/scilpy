@@ -127,7 +127,7 @@ def screenshot_peaks(img, orientation, slice_ids, size, mask_img=None):
                            img.shape, size)
 
 
-def compose_image(img_scene, img_size, slice_number, corner_position=(0, 0),
+def compose_image(img_scene, img_size, slice_number, *, corner_position=(0, 0),
                   transparency_scene=None, image_alpha=1.0,
                   labelmap_scene=None, labelmap_overlay_alpha=0.7,
                   overlays_scene=None, overlays_alpha=0.7,
@@ -142,7 +142,7 @@ def compose_image(img_scene, img_size, slice_number, corner_position=(0, 0),
     Parameters
     ----------
     img_scene : np.ndarray
-        Image scene data.
+        Image scene data. Data should be 2D (dimx, dimy, 3).
     img_size : array-like
         Image size (pixels) (width, height).
     slice_number : int
@@ -182,7 +182,6 @@ def compose_image(img_scene, img_size, slice_number, corner_position=(0, 0),
     canvas : PIL.Image
         Canvas containing the pasted scene.
     """
-
     if canvas is None:
         canvas = create_canvas(*img_size, 1, 1, 0, 0)
 

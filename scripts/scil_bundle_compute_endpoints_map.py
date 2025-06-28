@@ -32,12 +32,13 @@ from scilpy.io.utils import (add_json_args,
                              assert_outputs_exist)
 from scilpy.tractograms.streamline_and_mask_operations import \
     get_head_tail_density_maps
+from scilpy.version import version_string
 
 
 def _build_arg_parser():
-    p = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawTextHelpFormatter,
+                                epilog=version_string)
 
     p.add_argument('in_bundle',
                    help='Fiber bundle filename.')
@@ -45,14 +46,23 @@ def _build_arg_parser():
                    help='Output endpoints map head filename.')
     p.add_argument('endpoints_map_tail',
                    help='Output endpoints map tail filename.')
+    p.add_argument('--out_json',
+                   help='Output JSON file with the number of streamlines '
+                        'in each endpoint map. [%(default)s]',
+                   default='endpoints_map.json')
     p.add_argument('--swap', action='store_true',
                    help='Swap head<->tail convention. '
                         'Can be useful when the reference is not in RAS.')
     p.add_argument('--binary', action='store_true',
                    help="Save outputs as a binary mask instead of a heat map.")
-    p.add_argument('--nb_points', type=int, default=1,
-                   help="Number of points to consider at the extremities"
-                        " of the streamlines. [%(default)s]")
+
+    distance_g = p.add_argument_group(title='Distance options')
+    distance_g.add_argument('--distance', type=int, default=1,
+                            help="Distance to consider at the extremities "
+                            "of the streamlines. [%(default)s]")
+    distance_g.add_argument('--unit', type=str, choices=['points', 'mm'],
+                            default='points',
+                            help='Unit of the distance. [%(default)s]')
 
     add_json_args(p)
     add_reference_arg(p)
@@ -84,13 +94,20 @@ def main():
     head_name = args.endpoints_map_head
     tail_name = args.endpoints_map_tail
 
+    # Swap head and tail if necessary
     if swap:
         head_name = args.endpoints_map_tail
         tail_name = args.endpoints_map_head
 
-    endpoints_map_head, endpoints_map_tail = \
-        get_head_tail_density_maps(sft, args.nb_points)
+    # Distance and unit to consider at the extremities of the streamlines
+    nb_points = args.distance
+    to_mm = args.unit == 'mm'
 
+    # Compute the density maps
+    endpoints_map_head, endpoints_map_tail = \
+        get_head_tail_density_maps(sft, nb_points, to_millimeters=to_mm)
+
+    # Convert streamline density to binary mask
     if args.binary:
         endpoints_map_head = (endpoints_map_head > 0).astype(np.int16)
         endpoints_map_tail = (endpoints_map_tail > 0).astype(np.int16)
@@ -115,7 +132,9 @@ def main():
         }
     }
 
-    print(json.dumps(stats, indent=args.indent))
+    with open(args.out_json, 'w') as outfile:
+        json.dump(stats, outfile,
+                  indent=args.indent, sort_keys=args.sort_keys)
 
 
 if __name__ == '__main__':

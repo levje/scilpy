@@ -8,7 +8,8 @@ from scilpy import SCILPY_HOME
 from scilpy.io.fetcher import fetch_data, get_testing_files_dict
 
 # If they already exist, this only takes 5 seconds (check md5sum)
-fetch_data(get_testing_files_dict(), keys=['filtering.zip'])
+fetch_data(get_testing_files_dict(),
+           keys=['filtering.zip', 'tractograms.zip', 'connectivity.zip'])
 tmp_dir = tempfile.TemporaryDirectory()
 
 
@@ -111,3 +112,29 @@ def test_execution_labels_error_trim(script_runner, monkeypatch):
                             '--resample', '0.2', '--compress', '0.1'
                             '--trim_endpoints')
     assert not ret.success
+
+
+def test_execution_labels_no_point(script_runner, monkeypatch):
+    monkeypatch.chdir(os.path.expanduser(tmp_dir.name))
+    in_tractogram = os.path.join(SCILPY_HOME, 'connectivity',
+                                 'bundle_all_1mm.trk')
+    in_labels = os.path.join(SCILPY_HOME, 'connectivity',
+                             'endpoints_atlas.nii.gz')
+    ret = script_runner.run('scil_tractogram_cut_streamlines.py',
+                            in_tractogram, '--labels', in_labels,
+                            'out_tractogram_cut.trk', '-f',
+                            '--no_point_in_roi', '--label_ids', '1', '10')
+    assert ret.success
+
+
+def test_execution_labels_one_point(script_runner, monkeypatch):
+    monkeypatch.chdir(os.path.expanduser(tmp_dir.name))
+    in_tractogram = os.path.join(SCILPY_HOME, 'connectivity',
+                                 'bundle_all_1mm.trk')
+    in_labels = os.path.join(SCILPY_HOME, 'connectivity',
+                             'endpoints_atlas.nii.gz')
+    ret = script_runner.run('scil_tractogram_cut_streamlines.py',
+                            in_tractogram, '--labels', in_labels,
+                            'out_tractogram_cut.trk', '-f',
+                            '--one_point_in_roi', '--label_ids', '1', '10')
+    assert ret.success

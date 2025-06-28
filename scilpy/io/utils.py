@@ -22,6 +22,8 @@ from scilpy.utils.filenames import split_name_with_nii
 from scilpy.utils.spatial import RAS_AXES_NAMES
 
 
+FLOATING_POINTS_PRECISION = 12
+
 eddy_options = ["mb", "mb_offs", "slspec", "mporder", "s2v_lambda", "field",
                 "field_mat", "flm", "slm", "fwhm", "niter", "s2v_niter",
                 "cnr_maps", "residuals", "fep", "interp", "s2v_interp",
@@ -270,10 +272,22 @@ def add_skip_b0_check_arg(parser, will_overwrite_with_min,
         msg += ('If no b-value is found below the threshold, the script will '
                 'continue \nwith your minimal b-value as new {}.\n'
                 .format(b0_tol_name))
+    else:
+        msg += ('If no b-value is found below the threshold, the script will '
+                'continue \nwith the original {} and no b0 volumes.\n'
+                .format(b0_tol_name))
     msg += 'Use with care, and only if you understand your data.'
 
     parser.add_argument(
         '--skip_b0_check', action='store_true', help=msg)
+
+
+def add_precision_arg(parser):
+    parser.add_argument('--precision', type=ranged_type(int, 1),
+                        default=FLOATING_POINTS_PRECISION,
+                        help='Precision for floating point values. Numbers '
+                             'are rounded up to \nthe number of decimals '
+                             'provided. [Default: %(default)s]')
 
 
 def add_verbose_arg(parser):
@@ -459,18 +473,18 @@ def add_overlays_screenshot_args(parser, default_alpha=0.5,
     rpg = rendering_parsing_group or parser
     rpg.add_argument("--overlays_as_contours", action='store_true',
                      help="Display overlays contours and reduce the opacity "
-                          "of their inner region (see the "
+                          "of their \ninner region (see the "
                           "`--overlays_opacity` argument).")
     rpg.add_argument("--overlays_colors", nargs="+",
                      type=ranged_type(int, 0, 255), metavar="R G B",
                      help="Colors for the overlays or contours. You may "
-                          "provide a single color, for all overlays/contours, "
-                          "or one color for each. Each color is given as "
-                          "three values: R G B")
+                          "provide a single color, \nfor all "
+                          "overlays/contours, or one color for each. Each "
+                          "color is given \nas three values: R G B")
     rpg.add_argument("--overlays_opacity", type=ranged_type(float, 0., 1.),
                      default=default_alpha,
                      help="Opacity value for the masks overlays. When "
-                          "combined with `--overlays_as_contours`, this will "
+                          "combined with `--overlays_as_contours`,\nthis will "
                           "be the opacity of the region inside the computed "
                           "contours. [%(default)s]")
 
@@ -553,10 +567,10 @@ def add_default_screenshot_args(parser, slice_ids_mandatory=True,
 
     _output_help = "Name of the output image (e.g. img.jpg, img.png)."
     if not slice_ids_mandatory:
-        _output_help = "Name of the output image(s). If multiple slices are " \
-                       "provided (or none), their index will be append to " \
-                       "the name (e.g. volume.jpg, volume.png becomes " \
-                       "volume_slice_0.jpg, volume_slice_0.png)."
+        _output_help = ("Name of the output image(s). If multiple slices are"
+                        "provided (or none),\ntheir index will be appended to "
+                        "the name (e.g. volume.jpg, volume.png \nbecome "
+                        "volume_slice_0.jpg, volume_slice_0.png).")
 
     add_volume_screenshot_args(parser, "volume",
                                cmap_parsing_group=cmap_parsing_group,
@@ -565,12 +579,12 @@ def add_default_screenshot_args(parser, slice_ids_mandatory=True,
     if transparency_mask_mandatory:
         parser.add_argument("transparency",
                             help="Transparency Nifti image (.nii/.nii.gz). "
-                                 "Can either be a binary mask or a scalar "
+                                 "Can either be a \nbinary mask or a scalar "
                                  "image in the range [0, 1].")
     else:
         parser.add_argument("--transparency",
                             help="Transparency Nifti image (.nii/.nii.gz). "
-                                 "Can either be a binary mask or a scalar "
+                                 "Can either be a \nbinary mask or a scalar "
                                  "image in the range [0, 1].")
 
     parser.add_argument("out_fname", help=_output_help)
@@ -587,7 +601,7 @@ def add_default_screenshot_args(parser, slice_ids_mandatory=True,
         sg = slicing_parsing_group or parser
         sg.add_argument("--slices", nargs="+", type=int, metavar="SID",
                         help="Slice indices to screenshot. If None are "
-                             "supplied, all slices inside the transparency "
+                             "supplied, \nall slices inside the transparency "
                              "mask are selected.")
 
         sg.add_argument("--axis", default="axial",
@@ -706,15 +720,54 @@ def assert_inputs_exist(parser, required, optional=None):
     ----------
     parser: argparse.ArgumentParser object
         Parser.
-    required: string or list of paths
+    required: string or list of paths or list of lists of paths
         Required paths to be checked.
-    optional: string or list of paths
+    optional: string or list of paths or list of lists of paths
         Optional paths to be checked.
     """
 
     def check(path):
         if not os.path.isfile(path):
             parser.error('Input file {} does not exist'.format(path))
+
+    if isinstance(required, str):
+        required = [required]
+
+    if isinstance(optional, str):
+        optional = [optional]
+
+    for required_file in required:
+        if isinstance(required_file, str):
+            check(required_file)
+        else:
+            for file in required_file:
+                check(file)
+    for optional_file in optional or []:
+        if optional_file is not None:
+            if isinstance(optional_file, str):
+                check(optional_file)
+            else:
+                for file in optional_file:
+                    check(file)
+
+
+def assert_inputs_dirs_exist(parser, required, optional=None):
+    """
+    Assert that all inputs directories exist. If not, print parser's usage and
+    exit.
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser object
+        Parser.
+    required: string or list of paths
+        Required paths to be checked.
+    optional: string or list of paths
+        Optional paths to be checked.
+    """
+    def check(path):
+        if not os.path.isdir(path):
+            parser.error('Input directory {} does not exist'.format(path))
 
     if isinstance(required, str):
         required = [required]
@@ -1005,7 +1058,7 @@ def save_matrix_in_any_format(filepath, output_data):
         raise ValueError('Extension {} is not supported'.format(ext))
 
 
-def assert_fsl_options_exist(parser, options_args, command):
+def assert_fsl_options_exist(parser, options_args, command, overwrite=False):
     """
     Assert that all options for topup or eddy exist.
     If not, print parser's usage and exit.
@@ -1018,6 +1071,8 @@ def assert_fsl_options_exist(parser, options_args, command):
         Options for fsl command
     command: string
         Command used (eddy or topup).
+    overwrite: bool
+        If true, will only print a warning if an option is not valid.
     """
     if command == 'eddy':
         fsl_options = eddy_options
@@ -1033,8 +1088,13 @@ def assert_fsl_options_exist(parser, options_args, command):
 
     for nOption in res:
         if nOption not in fsl_options:
-            parser.error('--{} is not a valid option for '
-                         '{} command.'.format(nOption, command))
+            if overwrite:
+                logging.warning('--{} may not be a valid option for '
+                                '{} command depending '
+                                'of its version.'.format(nOption, command))
+            else:
+                parser.error('--{} is not a valid option for '
+                             '{} command.'.format(nOption, command))
 
 
 def parser_color_type(arg):
