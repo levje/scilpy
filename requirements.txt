@@ -27,7 +27,7 @@ nilearn==0.9.*
 numba==0.59.1
 numba-kdtree==0.4.0
 nltk==3.8.*
-numpy>=1.25,<2
+numpy==1.25.*
 openpyxl==3.0.*
 packaging == 23.2.*
 Pillow==10.2.*
